@@ -27,17 +27,14 @@ consumer = KafkaConsumer (
 def process_msg(msg):
     pass
 
-# Hàm lấy thông tin từ topic (hứng topic từ K8s) và lưu vào file
 def listening(topic_names):
     consumer.subscribe(topic_names)
 
     for message in consumer:
         try:
             msg = json.loads(message.value.decode("utf-8"))
-            #print(msg['log'])
-            # xét điều kiện log từ API với dạng LOG-REQ-RESP
             if "LOG-REQ-RESP" in msg['log']:
-                result, table = process_msg(msg) # msg["log"] là kiểu str, xử lý log
+                result, table = process_msg(msg)
                 if result != None:
                     cur = conn.cursor()
                     cur.execute("INSERT INTO sensors(sensorID, value, when) VALUES('#012', 9, '25/10/2023')");
