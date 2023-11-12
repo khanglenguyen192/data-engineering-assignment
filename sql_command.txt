@@ -1,0 +1,53 @@
+-- Create Field Table
+CREATE TABLE field (
+    field_id SERIAL PRIMARY KEY,
+    field_name VARCHAR(255) NOT NULL,
+    area DECIMAL(10, 2) NOT NULL, -- in square meters or acres
+    "location" VARCHAR(255) NOT NULL -- Geospatial data for field location
+    -- Add other relevant attributes
+);
+
+-- Create Weather Table
+CREATE TABLE weather (
+    weather_id SERIAL PRIMARY KEY,
+    observation_time TIMESTAMP NOT NULL,
+    temperature DECIMAL(5, 2),
+    humidity DECIMAL(5, 2),
+    precipitation DECIMAL(5, 2)
+    -- Add other relevant attributes
+);
+
+-- Create Sensor Table
+CREATE TABLE sensor (
+    sensor_id SERIAL PRIMARY KEY,
+    field_id INT REFERENCES field(field_id),
+    sensor_type VARCHAR(50) NOT NULL,
+    installation_date DATE
+    -- Add other relevant attributes
+);
+
+-- Create Sensor Data Table
+CREATE TABLE sensor_data (
+    data_id SERIAL PRIMARY KEY,
+    sensor_id INT REFERENCES sensor(sensor_id),
+    type VARCHAR(50) NOT NULL,
+    observation_time TIMESTAMP NOT NULL,
+    "value" DECIMAL(10, 2)
+    -- Add other relevant attributes
+);
+
+CREATE TABLE decision_history (
+    decision_id SERIAL PRIMARY KEY,
+    sensor_id INT REFERENCES sensor(sensor_id),
+    observation_time TIMESTAMP NOT NULL,
+    decision_msg VARCHAR(255) NOT NULL
+    -- Add other relevant attributes
+);
+
+CREATE TABLE alert_history (
+    alert_id SERIAL PRIMARY KEY,
+    sensor_id INT REFERENCES sensor(sensor_id),
+    observation_time TIMESTAMP NOT NULL,
+    alert_msg VARCHAR(255) NOT NULL
+    -- Add other relevant attributes
+);

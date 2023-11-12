@@ -3,48 +3,86 @@ import json
 import os
 import psycopg2
 
+# Config postgreSQL
 conn = psycopg2.connect(database = "smart_farm", 
-                        user = "admin", 
+                        user = "root", 
                         host= 'localhost',
-                        password = "admin",
+                        password = "root",
                         port = 5432)
 
 # Define topics for listening
-topic_name_list = ["sensors"]
+topic_name_list = ["soil_topic", 'water_topic', 'weather_topic']
 
 # Config kafka consumer
 consumer = KafkaConsumer (
-    bootstrap_servers = 'localhost'
-    , group_id= 'sensors'
+    bootstrap_servers = 'localhost:29092'
+    # , group_id='sensors'
     , auto_offset_reset = 'latest'
-    #enable_auto_commit=True
-    #security_protocol =  'SASL_PLAINTEXT',
+    ,enable_auto_commit=True
+    ,security_protocol =  'PLAINTEXT',
     #sasl_mechanism = 'SCRAM-SHA-512',
     #sasl_plain_username='admin',
     #sasl_plain_password='admin'
     )
 
-def process_msg(msg):
-    pass
+def checking_weather_alert(temperature, humidity, precipitation, observation_time):
+    alert = None
+    if temperature > 40 or temperature < 10 or humidity < 0.3 or humidity > 0.6 or precipitation > 10:
+        alert =  "Weather is harmless with temperature: {}, humidity: {}, precipitation: {} at {}.".format(temperature, humidity, precipitation, observation_time)
+    return alert
 
-def listening(topic_names):
+def checking_moisture_lv_alert(sensor_id, moisture_lv, observation_time):
+    alert = None
+    if moisture_lv > 0.8 or moisture_lv < 0.2:
+        alert =  "Soil is harmless measured by sensor: {}, with moisture level: {} at {} .".format(sensor_id, moisture_lv, observation_time)
+    return alert
+
+def checking_auto_decision():
+    return
+
+def consume_msg(topic_names):
     consumer.subscribe(topic_names)
 
     for message in consumer:
         try:
             msg = json.loads(message.value.decode("utf-8"))
-            if "LOG-REQ-RESP" in msg['log']:
-                result, table = process_msg(msg)
-                if result != None:
+            if msg != None:
+                print('PROCESSING MESSAGE: ', msg)
+                # sensor devices
+                if 'sensor_id' in msg:
+                    sensor_id, sensor_type, observation_time, value = msg['sensor_id'], msg['type'], msg['observation_time'], msg['value']
                     cur = conn.cursor()
-                    cur.execute("INSERT INTO sensors(sensorID, value, when) VALUES('#012', 9, '25/10/2023')");
+                    if sensor_type == 'SOIL':
+                        soil_alert = checking_moisture_lv_alert(sensor_id, value, observation_time)
+                        if soil_alert is not None:
+                            cur.execute("INSERT INTO alert_history(sensor_id, observation_time, alert_msg) VALUES({}, '{}', '{}')".format(sensor_id, observation_time, soil_alert))
+                    cur.execute("INSERT INTO sensor_data(sensor_id, type, observation_time, value) VALUES({}, '{}', '{}', {})".format(sensor_id, sensor_type, observation_time, value));
+
+                    conn.commit()
+                    cur.close()
+                # weather station
+                else:
+                    temperature, humidity, precipitation, observation_time = msg['temperature'], msg['humidity'], msg['precipitation'], msg['observation_time']
+                    weather_alert = checking_weather_alert(temperature, humidity, precipitation, observation_time)
+                    cur = conn.cursor()
+                    cur.execute("INSERT INTO weather(temperature, humidity, precipitation, observation_time) VALUES({}, {}, {}, '{}')".format(temperature, humidity, precipitation, observation_time))
+                    
+                    # trigger alert for weather device
+                    if weather_alert is not None:
+                        cur.execute("INSERT INTO alert_history(observation_time, alert_msg) VALUES('{}', '{}')".format(observation_time, weather_alert))
 
                     conn.commit()
                     cur.close()
         except:
-            print('exception!')
+            print('exception! with: ', msg)
+            # make a new transaction
+            conn = psycopg2.connect(database = "smart_farm", 
+                        user = "root", 
+                        host= 'localhost',
+                        password = "root",
+                        port = 5432)
     conn.close()
 
-# # Chạy hàm main
+# main function
 if __name__== "__main__":
-    listening(topic_name_list)
+    consume_msg(topic_name_list)
