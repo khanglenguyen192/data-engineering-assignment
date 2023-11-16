@@ -23,6 +23,13 @@ def query_for_analysis():
         plt.plot(df.index, df['temperature'])
         plt.show()
 
+        # Line chart for temperature
+        plt.title('Line chart of humidity in today')
+        plt.xlabel('DateTime', fontsize=15)
+        plt.ylabel('Humidity', fontsize=15)
+        plt.plot(df.index, df['humidity'])
+        plt.show()
+
     except (Exception, psycopg2.DatabaseError) as error:
         print(error)
     finally:

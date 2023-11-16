@@ -20,7 +20,7 @@ CREATE TABLE weather (
 -- Create Sensor Table
 CREATE TABLE sensor (
     sensor_id SERIAL PRIMARY KEY,
-    field_id INT REFERENCES field(field_id),
+	field_id INT REFERENCES field(field_id),
     sensor_type VARCHAR(50) NOT NULL,
     installation_date DATE
     -- Add other relevant attributes

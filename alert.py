@@ -28,13 +28,13 @@ consumer = KafkaConsumer (
 def checking_weather_alert(temperature, humidity, precipitation, observation_time):
     alert = None
     if temperature > 40 or temperature < 10 or humidity < 0.3 or humidity > 0.6 or precipitation > 10:
-        alert =  "Weather is harmless with temperature: {}, humidity: {}, precipitation: {} at {}.".format(temperature, humidity, precipitation, observation_time)
+        alert =  "Weather is harmful with temperature: {}, humidity: {}, precipitation: {} at {}.".format(temperature, humidity, precipitation, observation_time)
     return alert
 
 def checking_moisture_lv_alert(sensor_id, moisture_lv, observation_time):
     alert = None
     if moisture_lv > 0.8 or moisture_lv < 0.2:
-        alert =  "Soil is harmless measured by sensor: {}, with moisture level: {} at {} .".format(sensor_id, moisture_lv, observation_time)
+        alert =  "Soil is harmful measured by sensor: {}, with moisture level: {} at {} .".format(sensor_id, moisture_lv, observation_time)
     return alert
 
 def checking_auto_decision():
@@ -47,23 +47,31 @@ def consume_msg(topic_names):
         try:
             msg = json.loads(message.value.decode("utf-8"))
             if msg != None:
-                print('PROCESSING MESSAGE: ', msg)
                 # sensor devices
                 if 'sensor_id' in msg:
                     sensor_id, sensor_type, observation_time, value = msg['sensor_id'], msg['type'], msg['observation_time'], msg['value']
-                    cur = conn.cursor()
-                    cur.execute("INSERT INTO sensor_data(sensor_id, type, observation_time, value) VALUES({}, '{}', '{}', {})".format(sensor_id, sensor_type, observation_time, value));
+                    if sensor_type == 'SOIL':
+                        soil_alert = checking_moisture_lv_alert(sensor_id, value, observation_time)
+                        if soil_alert is not None:
+                            cur = conn.cursor()
+                            cur.execute("INSERT INTO alert_history(sensor_id, observation_time, alert_msg) VALUES({}, '{}', '{}')".format(sensor_id, observation_time, soil_alert))
+                            conn.commit()
 
-                    conn.commit()
-                    cur.close()
+                            print('ALERT! ', soil_alert)
+
+                            cur.close()
                 # weather station
                 else:
                     temperature, humidity, precipitation, observation_time = msg['temperature'], msg['humidity'], msg['precipitation'], msg['observation_time']
-                    cur = conn.cursor()
-                    cur.execute("INSERT INTO weather(temperature, humidity, precipitation, observation_time) VALUES({}, {}, {}, '{}')".format(temperature, humidity, precipitation, observation_time))
-
-                    conn.commit()
-                    cur.close()
+                    weather_alert = checking_weather_alert(temperature, humidity, precipitation, observation_time)
+                    
+                    # trigger alert for weather device
+                    if weather_alert is not None:
+                        cur = conn.cursor()
+                        cur.execute("INSERT INTO alert_history(observation_time, alert_msg) VALUES('{}', '{}')".format(observation_time, weather_alert))
+                        conn.commit()
+                        print('ALERT! ', weather_alert)
+                        cur.close()
         except:
             # print('exception! with: ', msg)
             # make a new transaction
